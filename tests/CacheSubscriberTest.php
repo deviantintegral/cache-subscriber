@@ -1,6 +1,9 @@
 <?php
 namespace GuzzleHttp\Tests\Subscriber\Cache;
 
+require_once __DIR__ . '/../vendor/guzzlehttp/ringphp/tests/Client/Server.php';
+require_once __DIR__ . '/../vendor/guzzlehttp/guzzle/tests/Server.php';
+
 use GuzzleHttp\Client;
 use GuzzleHttp\Event\ErrorEvent;
 use GuzzleHttp\Exception\ServerException;
