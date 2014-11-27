@@ -14,12 +14,12 @@ use GuzzleHttp\Tests\Server;
 
 class CacheSubscriberTest extends \PHPUnit_Framework_TestCase
 {
-    public static function setupBeforeClass()
+    protected function setUp()
     {
         Server::start();
     }
 
-    public static function tearDownAfterClass()
+    protected function tearDown()
     {
         Server::stop();
     }
