@@ -77,6 +77,6 @@ class CacheSubscriberTest extends \PHPUnit_Framework_TestCase
         $response2 = $client->get('/foo');
         $this->assertEquals(200, $response2->getStatusCode());
         $this->assertEquals('Wed, 29 Oct 2014 20:52:15 GMT', $response1->getHeader('Date'));
-
+        $this->assertCount(2, Server::received());
     }
 }
