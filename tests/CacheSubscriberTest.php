@@ -51,9 +51,8 @@ class CacheSubscriberTest extends \PHPUnit_Framework_TestCase
         Server::enqueue([
           new Response(200, [
             'Date' => 'Wed, 29 Oct 2014 20:52:15 GMT',
-            'Cache-Control' => 'private, max-age=666, must-revalidate, stale-if-error=666',
+            'Cache-Control' => 'private, max-age=1, must-revalidate, stale-if-error=666',
             'Last-Modified' => 'Wed, 29 Oct 2014 20:30:57 GMT',
-            'Age' => '100'
           ]),
           new Response(503, [
             'Date' => 'Wed, 29 Oct 2014 20:55:15 GMT',
