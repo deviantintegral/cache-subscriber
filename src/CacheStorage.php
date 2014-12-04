@@ -329,8 +329,7 @@ class CacheStorage implements CacheStorageInterface
     private function cacheVary(
         RequestInterface $request,
         ResponseInterface $response
-    )
-    {
+    ) {
         $key = $this->keyPrefix . md5('vary ' . $this->getCacheKey($request));
         $this->cache->save($key, $this->normalizeVary($response), $this->getTtl($response));
     }
