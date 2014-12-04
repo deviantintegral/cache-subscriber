@@ -90,11 +90,20 @@ class IntegrationTest extends \PHPUnit_Framework_TestCase
 
         $client = $this->setupClient();
 
-        $response1 = $client->get('/foo', ['headers' => ['Accept' => 'text/html']]);
+        $response1 = $client->get(
+            '/foo',
+            ['headers' => ['Accept' => 'text/html']]
+        );
         $this->assertEquals('It works!', $this->getResponseBody($response1));
 
-        $response2 = $client->get('/foo', ['headers' => ['Accept' => 'application/json']]);
-        $this->assertEquals('MISS from GuzzleCache', $response2->getHeader('x-cache'));
+        $response2 = $client->get(
+            '/foo',
+            ['headers' => ['Accept' => 'application/json']]
+        );
+        $this->assertEquals(
+            'MISS from GuzzleCache',
+            $response2->getHeader('x-cache')
+        );
 
         $decoded = json_decode($this->getResponseBody($response2));
 
@@ -114,17 +123,56 @@ class IntegrationTest extends \PHPUnit_Framework_TestCase
         $this->setupMultipleVaryResponses();
         $client = $this->setupClient();
 
-        $response1 = $client->get('/foo', ['headers' => ['Accept' => 'text/html', 'User-Agent' => 'Testing/1.0']]);
-        $this->assertEquals('Test/1.0 request.', $this->getResponseBody($response1));
+        $response1 = $client->get(
+            '/foo',
+            [
+                'headers' => [
+                    'Accept' => 'text/html',
+                    'User-Agent' => 'Testing/1.0'
+                ]
+            ]
+        );
+        $this->assertEquals(
+            'Test/1.0 request.',
+            $this->getResponseBody($response1)
+        );
 
-        $response2 = $client->get('/foo', ['headers' => ['Accept' => 'text/html', 'User-Agent' => 'Testing/2.0']]);
-        $this->assertEquals('MISS from GuzzleCache', $response2->getHeader('x-cache'));
-        $this->assertEquals('Test/2.0 request.', $this->getResponseBody($response2));
+        $response2 = $client->get(
+            '/foo',
+            [
+                'headers' => [
+                    'Accept' => 'text/html',
+                    'User-Agent' => 'Testing/2.0'
+                ]
+            ]
+        );
+        $this->assertEquals(
+            'MISS from GuzzleCache',
+            $response2->getHeader('x-cache')
+        );
+        $this->assertEquals(
+            'Test/2.0 request.',
+            $this->getResponseBody($response2)
+        );
 
         // Test that we get cache hits where both Vary headers match.
-        $response5 = $client->get('/foo', ['headers' => ['Accept' => 'text/html', 'User-Agent' => 'Testing/2.0']]);
-        $this->assertEquals('HIT from GuzzleCache', $response5->getHeader('x-cache'));
-        $this->assertEquals('Test/2.0 request.', $this->getResponseBody($response5));
+        $response5 = $client->get(
+            '/foo',
+            [
+                'headers' => [
+                    'Accept' => 'text/html',
+                    'User-Agent' => 'Testing/2.0'
+                ]
+            ]
+        );
+        $this->assertEquals(
+            'HIT from GuzzleCache',
+            $response5->getHeader('x-cache')
+        );
+        $this->assertEquals(
+            'Test/2.0 request.',
+            $this->getResponseBody($response5)
+        );
 
     }
 
@@ -137,16 +185,60 @@ class IntegrationTest extends \PHPUnit_Framework_TestCase
         $client = $this->setupClient();
 
         // Prime the cache.
-        $client->get('/foo', ['headers' => ['Accept' => 'text/html', 'User-Agent' => 'Testing/1.0']]);
-        $client->get('/foo', ['headers' => ['Accept' => 'text/html', 'User-Agent' => 'Testing/2.0']]);
+        $client->get(
+            '/foo',
+            [
+                'headers' => [
+                    'Accept' => 'text/html',
+                    'User-Agent' => 'Testing/1.0'
+                ]
+            ]
+        );
+        $client->get(
+            '/foo',
+            [
+                'headers' => [
+                    'Accept' => 'text/html',
+                    'User-Agent' => 'Testing/2.0'
+                ]
+            ]
+        );
 
-        $response1 = $client->get('/foo', ['headers' => ['Accept' => 'application/json', 'User-Agent' => 'Testing/1.0']]);
-        $this->assertEquals('MISS from GuzzleCache', $response1->getHeader('x-cache'));
-        $this->assertEquals('Test/1.0 request.', json_decode($this->getResponseBody($response1))->body);
+        $response1 = $client->get(
+            '/foo',
+            [
+                'headers' => [
+                    'Accept' => 'application/json',
+                    'User-Agent' => 'Testing/1.0'
+                ]
+            ]
+        );
+        $this->assertEquals(
+            'MISS from GuzzleCache',
+            $response1->getHeader('x-cache')
+        );
+        $this->assertEquals(
+            'Test/1.0 request.',
+            json_decode($this->getResponseBody($response1))->body
+        );
 
-        $response2 = $client->get('/foo', ['headers' => ['Accept' => 'application/json', 'User-Agent' => 'Testing/2.0']]);
-        $this->assertEquals('MISS from GuzzleCache', $response2->getHeader('x-cache'));
-        $this->assertEquals('Test/2.0 request.', json_decode($this->getResponseBody($response2))->body);
+        $response2 = $client->get(
+            '/foo',
+            [
+                'headers' => [
+                    'Accept' => 'application/json',
+                    'User-Agent' => 'Testing/2.0'
+                ]
+            ]
+        );
+        $this->assertEquals(
+            'MISS from GuzzleCache',
+            $response2->getHeader('x-cache')
+        );
+        $this->assertEquals(
+            'Test/2.0 request.',
+            json_decode($this->getResponseBody($response2))->body
+        );
     }
 
     /**
@@ -158,10 +250,38 @@ class IntegrationTest extends \PHPUnit_Framework_TestCase
         $client = $this->setupClient();
 
         // Prime the cache.
-        $client->get('/foo', ['headers' => ['Accept' => 'text/html', 'User-Agent' => 'Testing/1.0']]);
-        $client->get('/foo', ['headers' => ['Accept' => 'text/html', 'User-Agent' => 'Testing/2.0']]);
-        $client->get('/foo', ['headers' => ['Accept' => 'application/json', 'User-Agent' => 'Testing/1.0']]);
-        $client->get('/foo', ['headers' => ['Accept' => 'application/json', 'User-Agent' => 'Testing/2.0']]);
+        $client->get('/foo',
+            [
+                'headers' => [
+                    'Accept' => 'text/html',
+                    'User-Agent' => 'Testing/1.0'
+                ]
+            ]
+        );
+        $client->get('/foo',
+            [
+                'headers' => [
+                    'Accept' => 'text/html',
+                    'User-Agent' => 'Testing/2.0'
+                ]
+            ]
+        );
+        $client->get('/foo',
+            [
+                'headers' => [
+                    'Accept' => 'application/json',
+                    'User-Agent' => 'Testing/1.0'
+                ]
+            ]
+        );
+        $client->get('/foo',
+            [
+                'headers' => [
+                    'Accept' => 'application/json',
+                    'User-Agent' => 'Testing/2.0'
+                ]
+            ]
+        );
 
         $response = $client->get(
             '/foo',
