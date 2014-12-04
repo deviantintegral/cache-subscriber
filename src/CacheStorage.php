@@ -174,10 +174,8 @@ class CacheStorage implements CacheStorageInterface
 
         // If Vary headers have been passed in, fetch each header and add it to
         // the cache key.
-        if (!empty($vary)) {
-            foreach ($vary as $header) {
-                $key .= " $header: " . $request->getHeader($header);
-            }
+        foreach ($vary as $header) {
+            $key .= " $header: " . $request->getHeader($header);
         }
 
         return $this->keyPrefix
