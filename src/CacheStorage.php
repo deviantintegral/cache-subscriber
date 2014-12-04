@@ -349,6 +349,6 @@ class CacheStorage implements CacheStorageInterface
     {
         $key = $this->keyPrefix . md5('vary ' . $this->getCacheKey($request));
 
-        return $this->cache->fetch($key);
+        return (array) $this->cache->fetch($key);
     }
 }
