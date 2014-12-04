@@ -99,11 +99,9 @@ class CacheStorage implements CacheStorageInterface
     public function fetch(RequestInterface $request)
     {
         $vary = $this->fetchVary($request);
-        if ($vary)
-        {
+        if ($vary) {
             $key = $this->getCacheKey($request, $vary);
-        }
-        else {
+        } else {
             $key = $this->getCacheKey($request);
         }
         $entries = $this->cache->fetch($key);
@@ -163,7 +161,10 @@ class CacheStorage implements CacheStorageInterface
     /**
      * Hash a request URL into a string that returns cache metadata
      *
-     * @param RequestInterface $request
+     * @param RequestInterface $request The Request to generate the cache key
+     *                                  for.
+     * @param array            $vary    (optional) An array of headers to vary
+     *                                  the cache key by.
      *
      * @return string
      */
@@ -171,10 +172,10 @@ class CacheStorage implements CacheStorageInterface
     {
         $key = $request->getMethod() . ' ' . $request->getUrl();
 
-        if ($vary)
-        {
-            foreach ($vary as $header)
-            {
+        // If Vary headers have been passed in, fetch each header and add it to
+        // the cache key.
+        if (!empty($vary)) {
+            foreach ($vary as $header) {
                 $key .= " $header: " . $request->getHeader($header);
             }
         }
@@ -304,8 +305,14 @@ class CacheStorage implements CacheStorageInterface
     }
 
     /**
-     * @param ResponseInterface $response
-     * @return string
+     * Return a sorted list of Vary headers.
+     *
+     * While headers are case-insensitive, header values are not. We can only
+     * normalize the order of headers to combine cache entries.
+     *
+     * @param ResponseInterface $response The Response with Vary headers.
+     *
+     * @return array An array of sorted headers.
      */
     private function normalizeVary(ResponseInterface $response)
     {
@@ -315,24 +322,36 @@ class CacheStorage implements CacheStorageInterface
     }
 
     /**
-     * @param RequestInterface $request
-     * @param ResponseInterface $response
+     * Cache the Vary headers from a response.
+     *
+     * @param RequestInterface  $request  The Request that generated the Vary
+     *                                    headers.
+     * @param ResponseInterface $response The Response with Vary headers.
      */
     private function cacheVary(
-      RequestInterface $request,
-      ResponseInterface $response
-    ) {
+        RequestInterface $request,
+        ResponseInterface $response
+    )
+    {
         $varyDigest = md5('vary ' . $this->getCacheKey($request));
         $this->cache->save($varyDigest, $this->normalizeVary($response), $this->getTtl($response));
     }
 
     /**
-     * @param RequestInterface $request
-     * @return mixed
+     * Fetch the Vary headers associated with a request, if they exist.
+     *
+     * Only responses, and not requests, contain Vary headers. However, we need
+     * to be able to determine what Vary headers were set for a given URL and
+     * request method on a future request.
+     *
+     * @param RequestInterface $request The Request to fetch headers for.
+     *
+     * @return array An array of headers.
      */
     private function fetchVary(RequestInterface $request)
     {
         $varyDigest = md5('vary ' . $this->getCacheKey($request));
+
         return $this->cache->fetch($varyDigest);
     }
 }
