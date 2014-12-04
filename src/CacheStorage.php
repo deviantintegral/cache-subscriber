@@ -178,8 +178,7 @@ class CacheStorage implements CacheStorageInterface
             $key .= " $header: " . $request->getHeader($header);
         }
 
-        return $this->keyPrefix
-            . md5($key);
+        return $this->keyPrefix . md5($key);
     }
 
     /**
