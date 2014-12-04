@@ -43,10 +43,9 @@ class IntegrationTest extends \PHPUnit_Framework_TestCase
             ])
         ]);
 
-        $client = new Client(['base_url' => Server::$url]);
-        CacheSubscriber::attach($client);
         $history = new History();
-        $client->getEmitter()->attach($history);
+        $client = $this->setupClient($history);
+
         $response1 = $client->get('/foo');
         $this->assertEquals(200, $response1->getStatusCode());
         $response2 = $client->get('/foo');
@@ -89,10 +88,7 @@ class IntegrationTest extends \PHPUnit_Framework_TestCase
             ]
         );
 
-        $client = new Client(['base_url' => Server::$url]);
-        CacheSubscriber::attach($client);
-        $history = new History();
-        $client->getEmitter()->attach($history);
+        $client = $this->setupClient();
 
         $response1 = $client->get('/foo', ['headers' => ['Accept' => 'text/html']]);
         $this->assertEquals('It works!', $this->getResponseBody($response1));
@@ -109,7 +105,104 @@ class IntegrationTest extends \PHPUnit_Framework_TestCase
         }
     }
 
-    public function testMultipleVaryHeader()
+    /**
+     * Test that requests varying on both Accept and User-Agent properly split
+     * different User-Agents into different cache items.
+     */
+    public function testVaryUserAgent()
+    {
+        $this->setupMultipleVaryResponses();
+        $client = $this->setupClient();
+
+        $response1 = $client->get('/foo', ['headers' => ['Accept' => 'text/html', 'User-Agent' => 'Testing/1.0']]);
+        $this->assertEquals('Test/1.0 request.', $this->getResponseBody($response1));
+
+        $response2 = $client->get('/foo', ['headers' => ['Accept' => 'text/html', 'User-Agent' => 'Testing/2.0']]);
+        $this->assertEquals('MISS from GuzzleCache', $response2->getHeader('x-cache'));
+        $this->assertEquals('Test/2.0 request.', $this->getResponseBody($response2));
+
+        // Test that we get cache hits where both Vary headers match.
+        $response5 = $client->get('/foo', ['headers' => ['Accept' => 'text/html', 'User-Agent' => 'Testing/2.0']]);
+        $this->assertEquals('HIT from GuzzleCache', $response5->getHeader('x-cache'));
+        $this->assertEquals('Test/2.0 request.', $this->getResponseBody($response5));
+
+    }
+
+    /**
+     * Test that requests varying on Accept but not User-Agent return different responses.
+     */
+    public function testVaryAccept()
+    {
+        $this->setupMultipleVaryResponses();
+        $client = $this->setupClient();
+
+        // Prime the cache.
+        $client->get('/foo', ['headers' => ['Accept' => 'text/html', 'User-Agent' => 'Testing/1.0']]);
+        $client->get('/foo', ['headers' => ['Accept' => 'text/html', 'User-Agent' => 'Testing/2.0']]);
+
+        $response1 = $client->get('/foo', ['headers' => ['Accept' => 'application/json', 'User-Agent' => 'Testing/1.0']]);
+        $this->assertEquals('MISS from GuzzleCache', $response1->getHeader('x-cache'));
+        $this->assertEquals('Test/1.0 request.', json_decode($this->getResponseBody($response1))->body);
+
+        $response2 = $client->get('/foo', ['headers' => ['Accept' => 'application/json', 'User-Agent' => 'Testing/2.0']]);
+        $this->assertEquals('MISS from GuzzleCache', $response2->getHeader('x-cache'));
+        $this->assertEquals('Test/2.0 request.', json_decode($this->getResponseBody($response2))->body);
+    }
+
+    /**
+     * Test that we return cached responses when multiple Vary headers match.
+     */
+    public function testMultipleVaryMatch()
+    {
+        $this->setupMultipleVaryResponses();
+        $client = $this->setupClient();
+
+        // Prime the cache.
+        $client->get('/foo', ['headers' => ['Accept' => 'text/html', 'User-Agent' => 'Testing/1.0']]);
+        $client->get('/foo', ['headers' => ['Accept' => 'text/html', 'User-Agent' => 'Testing/2.0']]);
+        $client->get('/foo', ['headers' => ['Accept' => 'application/json', 'User-Agent' => 'Testing/1.0']]);
+        $client->get('/foo', ['headers' => ['Accept' => 'application/json', 'User-Agent' => 'Testing/2.0']]);
+
+        $response = $client->get(
+            '/foo',
+            [
+                'headers' => [
+                    'Accept' => 'application/json',
+                    'User-Agent' => 'Testing/2.0'
+                ]
+            ]
+        );
+        $this->assertEquals(
+            'HIT from GuzzleCache',
+            $response->getHeader('x-cache')
+        );
+        $this->assertEquals(
+            'Test/2.0 request.',
+            json_decode($this->getResponseBody($response))->body
+        );
+    }
+
+    /**
+     * Decode a response body from TestServer.
+     *
+     * TestServer encodes all responses with base64, so we need to decode them
+     * before we can do any assert's on them.
+     *
+     * @param Response $response The response with a body to decode.
+     *
+     * @return string
+     */
+    private function getResponseBody($response)
+    {
+        return base64_decode($response->getBody());
+    }
+
+    /**
+     * Set up responses used by our Vary tests.
+     *
+     * @throws \Exception
+     */
+    private function setupMultipleVaryResponses()
     {
         $now = gmdate("D, d M Y H:i:s");
 
@@ -124,15 +217,17 @@ class IntegrationTest extends \PHPUnit_Framework_TestCase
                     'Last-Modified' => $now,
                 ], Stream::factory('Test/1.0 request.')
                 ),
-                new Response(200,
-                [
-                    'Vary' => 'Accept, User-Agent',
-                    'Content-type' => 'text/html',
-                    'Date' => $now,
-                    'Cache-Control' => 'public, s-maxage=1000, max-age=1000',
-                    'Last-Modified' => $now,
-                ],
-                Stream::factory('Test/2.0 request.')),
+                new Response(
+                    200,
+                    [
+                        'Vary' => 'Accept, User-Agent',
+                        'Content-type' => 'text/html',
+                        'Date' => $now,
+                        'Cache-Control' => 'public, s-maxage=1000, max-age=1000',
+                        'Last-Modified' => $now,
+                    ],
+                    Stream::factory('Test/2.0 request.')
+                ),
                 new Response(
                     200, [
                     'Vary' => 'Accept, User-Agent',
@@ -153,51 +248,24 @@ class IntegrationTest extends \PHPUnit_Framework_TestCase
                 ),
             ]
         );
-
-        $client = new Client(['base_url' => Server::$url]);
-        CacheSubscriber::attach($client);
-        $history = new History();
-        $client->getEmitter()->attach($history);
-
-        // Test that requests varying on User-Agent return different responses.
-        $response1 = $client->get('/foo', ['headers' => ['Accept' => 'text/html', 'User-Agent' => 'Testing/1.0']]);
-        $this->assertEquals('Test/1.0 request.', $this->getResponseBody($response1));
-
-        $response2 = $client->get('/foo', ['headers' => ['Accept' => 'text/html', 'User-Agent' => 'Testing/2.0']]);
-        $this->assertEquals('MISS from GuzzleCache', $response2->getHeader('x-cache'));
-        $this->assertEquals('Test/2.0 request.', $this->getResponseBody($response2));
-
-        // Test that requests varying on Accept but not User-Agent return different responses.
-        $response3 = $client->get('/foo', ['headers' => ['Accept' => 'application/json', 'User-Agent' => 'Testing/1.0']]);
-        $this->assertEquals('MISS from GuzzleCache', $response3->getHeader('x-cache'));
-        $this->assertEquals('Test/1.0 request.', json_decode($this->getResponseBody($response3))->body);
-
-        $response4 = $client->get('/foo', ['headers' => ['Accept' => 'application/json', 'User-Agent' => 'Testing/2.0']]);
-        $this->assertEquals('MISS from GuzzleCache', $response4->getHeader('x-cache'));
-        $this->assertEquals('Test/2.0 request.', json_decode($this->getResponseBody($response4))->body);
-
-        // Test that we get cache hits where both Vary headers match.
-        $response5 = $client->get('/foo', ['headers' => ['Accept' => 'text/html', 'User-Agent' => 'Testing/2.0']]);
-        $this->assertEquals('HIT from GuzzleCache', $response5->getHeader('x-cache'));
-        $this->assertEquals('Test/2.0 request.', $this->getResponseBody($response5));
-
-        $response5 = $client->get('/foo', ['headers' => ['Accept' => 'application/json', 'User-Agent' => 'Testing/2.0']]);
-        $this->assertEquals('HIT from GuzzleCache', $response5->getHeader('x-cache'));
-        $this->assertEquals('Test/2.0 request.', json_decode($this->getResponseBody($response5))->body);
     }
 
     /**
-     * Decode a response body from TestServer.
+     * Setup a Guzzle client for testing.
      *
-     * TestServer encodes all responses with base64, so we need to decode them
-     * before we can do any assert's on them.
+     * @param History $history (optional) parameter of a History to track
+     *                         requests in.
      *
-     * @param Response $response The response with a body to decode.
-     *
-     * @return string
+     * @return Client A client ready to run test requests against.
      */
-    private function getResponseBody($response)
+    private function setupClient(History $history = null)
     {
-        return base64_decode($response->getBody());
+        $client = new Client(['base_url' => Server::$url]);
+        CacheSubscriber::attach($client);
+        if ($history) {
+            $client->getEmitter()->attach($history);
+        }
+
+        return $client;
     }
 }
