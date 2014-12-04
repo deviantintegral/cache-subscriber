@@ -57,29 +57,37 @@ class IntegrationTest extends \PHPUnit_Framework_TestCase
         $this->assertEquals('HIT from GuzzleCache', $last->getHeader('X-Cache'));
     }
 
-    public function testVaryHeader()
+    /**
+     * Test that the Vary header creates unique cache entries.
+     *
+     * @throws \Exception
+     */
+    public function testVaryUniqueResponses()
     {
         $now = gmdate("D, d M Y H:i:s");
 
-        Server::enqueue([
-          new Response(200, [
-            'Vary' => 'Accept',
-            'Content-type' => 'text/html',
-            'Date' => $now,
-            'Cache-Control' => 'public, s-maxage=1000, max-age=1000',
-            'Last-Modified' => $now,
-          ], Stream::factory('It works!')
-          ),
-          new Response(
-            200, [
-            'Vary' => 'Accept',
-            'Content-type' => 'application/json',
-            'Date' => $now,
-            'Cache-Control' => 'public, s-maxage=1000, max-age=1000',
-            'Last-Modified' => $now,
-          ], Stream::factory(json_encode(['body' => 'It works!']))
-          ),
-        ]);
+        Server::enqueue(
+            [
+                new Response(
+                    200, [
+                    'Vary' => 'Accept',
+                    'Content-type' => 'text/html',
+                    'Date' => $now,
+                    'Cache-Control' => 'public, s-maxage=1000, max-age=1000',
+                    'Last-Modified' => $now,
+                ], Stream::factory('It works!')
+                ),
+                new Response(
+                    200, [
+                    'Vary' => 'Accept',
+                    'Content-type' => 'application/json',
+                    'Date' => $now,
+                    'Cache-Control' => 'public, s-maxage=1000, max-age=1000',
+                    'Last-Modified' => $now,
+                ], Stream::factory(json_encode(['body' => 'It works!']))
+                ),
+            ]
+        );
 
         $client = new Client(['base_url' => Server::$url]);
         CacheSubscriber::attach($client);
@@ -91,12 +99,10 @@ class IntegrationTest extends \PHPUnit_Framework_TestCase
 
         $response2 = $client->get('/foo', ['headers' => ['Accept' => 'application/json']]);
         $decoded = json_decode(base64_decode($response2->getBody()));
-        if (!isset($decoded) || !isset($decoded->body))
-        {
+
+        if (!isset($decoded) || !isset($decoded->body)) {
             $this->fail('JSON response could not be decoded.');
-        }
-        else
-        {
+        } else {
             $this->assertEquals('It works!', $decoded->body);
         }
     }
