@@ -1,6 +1,7 @@
 <?php
 namespace GuzzleHttp\Subscriber\Cache;
 
+use GuzzleHttp\Message\AbstractMessage;
 use GuzzleHttp\Message\MessageInterface;
 use GuzzleHttp\Message\Request;
 use GuzzleHttp\Message\RequestInterface;
@@ -40,10 +41,15 @@ class CacheStorage implements CacheStorageInterface
     ) {
         $ctime = time();
         $ttl = $this->getTtl($response);
-        $key = $this->getCacheKey($request);
+        $key = $this->getCacheKey($request, $this->normalizeVary($response));
         $headers = $this->persistHeaders($request);
         $entries = $this->getManifestEntries($key, $ctime, $response, $headers);
         $bodyDigest = null;
+
+        // Persist the Vary response header.
+        if ($response->hasHeader('vary')) {
+            $this->cacheVary($request, $response);
+        }
 
         // Persist the response body if needed
         if ($response->getBody() && $response->getBody()->getSize() > 0) {
@@ -65,7 +71,8 @@ class CacheStorage implements CacheStorageInterface
 
     public function delete(RequestInterface $request)
     {
-        $key = $this->getCacheKey($request);
+        $vary = $this->fetchVary($request);
+        $key = $this->getCacheKey($request, $vary);
         $entries = $this->cache->fetch($key);
 
         if (!$entries) {
@@ -91,7 +98,14 @@ class CacheStorage implements CacheStorageInterface
 
     public function fetch(RequestInterface $request)
     {
-        $key = $this->getCacheKey($request);
+        $vary = $this->fetchVary($request);
+        if ($vary)
+        {
+            $key = $this->getCacheKey($request, $vary);
+        }
+        else {
+            $key = $this->getCacheKey($request);
+        }
         $entries = $this->cache->fetch($key);
 
         if (!$entries) {
@@ -153,10 +167,20 @@ class CacheStorage implements CacheStorageInterface
      *
      * @return string
      */
-    private function getCacheKey(RequestInterface $request)
+    private function getCacheKey(RequestInterface $request, array $vary = array())
     {
+        $key = $request->getMethod() . ' ' . $request->getUrl();
+
+        if ($vary)
+        {
+            foreach ($vary as $header)
+            {
+                $key .= " $header: " . $request->getHeader($header);
+            }
+        }
+
         return $this->keyPrefix
-            . md5($request->getMethod() . ' ' . $request->getUrl());
+            . md5($key);
     }
 
     /**
@@ -277,5 +301,38 @@ class CacheStorage implements CacheStorageInterface
         }
 
         return $entries;
+    }
+
+    /**
+     * @param ResponseInterface $response
+     * @return string
+     */
+    private function normalizeVary(ResponseInterface $response)
+    {
+        $parts = AbstractMessage::normalizeHeader($response, 'vary');
+        sort($parts);
+        return $parts;
+    }
+
+    /**
+     * @param RequestInterface $request
+     * @param ResponseInterface $response
+     */
+    private function cacheVary(
+      RequestInterface $request,
+      ResponseInterface $response
+    ) {
+        $varyDigest = md5('vary ' . $this->getCacheKey($request));
+        $this->cache->save($varyDigest, $this->normalizeVary($response), $this->getTtl($response));
+    }
+
+    /**
+     * @param RequestInterface $request
+     * @return mixed
+     */
+    private function fetchVary(RequestInterface $request)
+    {
+        $varyDigest = md5('vary ' . $this->getCacheKey($request));
+        return $this->cache->fetch($varyDigest);
     }
 }
