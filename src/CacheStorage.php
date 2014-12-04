@@ -333,8 +333,8 @@ class CacheStorage implements CacheStorageInterface
         ResponseInterface $response
     )
     {
-        $varyDigest = md5('vary ' . $this->getCacheKey($request));
-        $this->cache->save($varyDigest, $this->normalizeVary($response), $this->getTtl($response));
+        $key = $this->keyPrefix . md5('vary ' . $this->getCacheKey($request));
+        $this->cache->save($key, $this->normalizeVary($response), $this->getTtl($response));
     }
 
     /**
@@ -350,8 +350,8 @@ class CacheStorage implements CacheStorageInterface
      */
     private function fetchVary(RequestInterface $request)
     {
-        $varyDigest = md5('vary ' . $this->getCacheKey($request));
+        $key = $this->keyPrefix . md5('vary ' . $this->getCacheKey($request));
 
-        return $this->cache->fetch($varyDigest);
+        return $this->cache->fetch($key);
     }
 }
