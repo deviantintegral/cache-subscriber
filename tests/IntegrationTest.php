@@ -98,6 +98,8 @@ class IntegrationTest extends \PHPUnit_Framework_TestCase
         $this->assertEquals('It works!', base64_decode($response1->getBody()));
 
         $response2 = $client->get('/foo', ['headers' => ['Accept' => 'application/json']]);
+        $this->assertEquals('MISS from GuzzleCache', $response2->getHeader('x-cache'));
+
         $decoded = json_decode(base64_decode($response2->getBody()));
 
         if (!isset($decoded) || !isset($decoded->body)) {
