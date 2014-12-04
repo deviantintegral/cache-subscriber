@@ -95,17 +95,32 @@ class IntegrationTest extends \PHPUnit_Framework_TestCase
         $client->getEmitter()->attach($history);
 
         $response1 = $client->get('/foo', ['headers' => ['Accept' => 'text/html']]);
-        $this->assertEquals('It works!', base64_decode($response1->getBody()));
+        $this->assertEquals('It works!', $this->getResponseBody($response1));
 
         $response2 = $client->get('/foo', ['headers' => ['Accept' => 'application/json']]);
         $this->assertEquals('MISS from GuzzleCache', $response2->getHeader('x-cache'));
 
-        $decoded = json_decode(base64_decode($response2->getBody()));
+        $decoded = json_decode($this->getResponseBody($response2));
 
         if (!isset($decoded) || !isset($decoded->body)) {
             $this->fail('JSON response could not be decoded.');
         } else {
             $this->assertEquals('It works!', $decoded->body);
         }
+    }
+
+    /**
+     * Decode a response body from TestServer.
+     *
+     * TestServer encodes all responses with base64, so we need to decode them
+     * before we can do any assert's on them.
+     *
+     * @param Response $response The response with a body to decode.
+     *
+     * @return string
+     */
+    private function getResponseBody($response)
+    {
+        return base64_decode($response->getBody());
     }
 }
