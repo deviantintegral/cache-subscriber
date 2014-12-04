@@ -109,6 +109,83 @@ class IntegrationTest extends \PHPUnit_Framework_TestCase
         }
     }
 
+    public function testMultipleVaryHeader()
+    {
+        $now = gmdate("D, d M Y H:i:s");
+
+        Server::enqueue(
+            [
+                new Response(
+                    200, [
+                    'Vary' => 'Accept, User-Agent',
+                    'Content-type' => 'text/html',
+                    'Date' => $now,
+                    'Cache-Control' => 'public, s-maxage=1000, max-age=1000',
+                    'Last-Modified' => $now,
+                ], Stream::factory('Test/1.0 request.')
+                ),
+                new Response(200,
+                [
+                    'Vary' => 'Accept, User-Agent',
+                    'Content-type' => 'text/html',
+                    'Date' => $now,
+                    'Cache-Control' => 'public, s-maxage=1000, max-age=1000',
+                    'Last-Modified' => $now,
+                ],
+                Stream::factory('Test/2.0 request.')),
+                new Response(
+                    200, [
+                    'Vary' => 'Accept, User-Agent',
+                    'Content-type' => 'application/json',
+                    'Date' => $now,
+                    'Cache-Control' => 'public, s-maxage=1000, max-age=1000',
+                    'Last-Modified' => $now,
+                ], Stream::factory(json_encode(['body' => 'Test/1.0 request.']))
+                ),
+                new Response(
+                    200, [
+                    'Vary' => 'Accept, User-Agent',
+                    'Content-type' => 'application/json',
+                    'Date' => $now,
+                    'Cache-Control' => 'public, s-maxage=1000, max-age=1000',
+                    'Last-Modified' => $now,
+                ], Stream::factory(json_encode(['body' => 'Test/2.0 request.']))
+                ),
+            ]
+        );
+
+        $client = new Client(['base_url' => Server::$url]);
+        CacheSubscriber::attach($client);
+        $history = new History();
+        $client->getEmitter()->attach($history);
+
+        // Test that requests varying on User-Agent return different responses.
+        $response1 = $client->get('/foo', ['headers' => ['Accept' => 'text/html', 'User-Agent' => 'Testing/1.0']]);
+        $this->assertEquals('Test/1.0 request.', $this->getResponseBody($response1));
+
+        $response2 = $client->get('/foo', ['headers' => ['Accept' => 'text/html', 'User-Agent' => 'Testing/2.0']]);
+        $this->assertEquals('MISS from GuzzleCache', $response2->getHeader('x-cache'));
+        $this->assertEquals('Test/2.0 request.', $this->getResponseBody($response2));
+
+        // Test that requests varying on Accept but not User-Agent return different responses.
+        $response3 = $client->get('/foo', ['headers' => ['Accept' => 'application/json', 'User-Agent' => 'Testing/1.0']]);
+        $this->assertEquals('MISS from GuzzleCache', $response3->getHeader('x-cache'));
+        $this->assertEquals('Test/1.0 request.', json_decode($this->getResponseBody($response3))->body);
+
+        $response4 = $client->get('/foo', ['headers' => ['Accept' => 'application/json', 'User-Agent' => 'Testing/2.0']]);
+        $this->assertEquals('MISS from GuzzleCache', $response4->getHeader('x-cache'));
+        $this->assertEquals('Test/2.0 request.', json_decode($this->getResponseBody($response4))->body);
+
+        // Test that we get cache hits where both Vary headers match.
+        $response5 = $client->get('/foo', ['headers' => ['Accept' => 'text/html', 'User-Agent' => 'Testing/2.0']]);
+        $this->assertEquals('HIT from GuzzleCache', $response5->getHeader('x-cache'));
+        $this->assertEquals('Test/2.0 request.', $this->getResponseBody($response5));
+
+        $response5 = $client->get('/foo', ['headers' => ['Accept' => 'application/json', 'User-Agent' => 'Testing/2.0']]);
+        $this->assertEquals('HIT from GuzzleCache', $response5->getHeader('x-cache'));
+        $this->assertEquals('Test/2.0 request.', json_decode($this->getResponseBody($response5))->body);
+    }
+
     /**
      * Decode a response body from TestServer.
      *
