@@ -55,20 +55,20 @@ class ValidationSubscriber implements SubscriberInterface
     private function validate(
         RequestInterface $request,
         ResponseInterface $response,
-        CompleteEvent $e
+        CompleteEvent $event
     ) {
         try {
             $validate = $this->createRevalidationRequest($request, $response);
-            $validated = $e->getClient()->send($validate);
+            $validated = $event->getClient()->send($validate);
         } catch (BadResponseException $e) {
             $this->handleBadResponse($e);
-            return;
+            throw $e;
         }
 
         if ($validated->getStatusCode() == 200) {
-            $this->handle200Response($request, $validated, $e);
+            $this->handle200Response($request, $validated, $event);
         } elseif ($validated->getStatusCode() == 304) {
-            $this->handle304Response($request, $response, $validated, $e);
+            $this->handle304Response($request, $response, $validated, $event);
         }
     }
 
