@@ -62,7 +62,6 @@ class ValidationSubscriber implements SubscriberInterface
             $validated = $event->getClient()->send($validate);
         } catch (BadResponseException $e) {
             $this->handleBadResponse($e);
-            throw $e;
         }
 
         if ($validated->getStatusCode() == 200) {
@@ -113,11 +112,12 @@ class ValidationSubscriber implements SubscriberInterface
     private function handleBadResponse(BadResponseException $e)
     {
         // 404 errors mean the resource no longer exists, so remove from
-        // cache, and prevent an additional request by throwing the exception
+        // cache.
         if ($e->getResponse()->getStatusCode() == 404) {
             $this->storage->delete($e->getRequest());
-            throw $e;
         }
+
+        throw $e;
     }
 
     /**
